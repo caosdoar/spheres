@@ -6,7 +6,7 @@ When the graphics programmer face the problem of creating a mesh for a sphere wi
 
 ## Building the mesh
 
-![alt text](https://github.com/caosdoar/spheres/raw/master/img/spheres4.png "Spheres comparison")
+![alt text](https://github.com/caosdoar/spheres/raw/master/img/spheres_4.png "Spheres comparison")
 
 ### Standard sphere
 
