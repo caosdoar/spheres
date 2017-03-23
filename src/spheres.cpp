@@ -39,6 +39,7 @@ SOFTWARE.
 #define _USE_MATH_DEFINES
 #include <cmath>
 #include <vector>
+#include <map>
 #include <random>
 #include <string>
 #include <iostream>
@@ -105,6 +106,16 @@ struct Mesh
 		triangles.emplace_back(b);
 		triangles.emplace_back(c);
 		triangles.emplace_back(a);
+		triangles.emplace_back(c);
+		triangles.emplace_back(d);
+	}
+
+	void addQuadAlt(uint32_t a, uint32_t b, uint32_t c, uint32_t d)
+	{
+		triangles.emplace_back(a);
+		triangles.emplace_back(b);
+		triangles.emplace_back(d);
+		triangles.emplace_back(b);
 		triangles.emplace_back(c);
 		triangles.emplace_back(d);
 	}
@@ -271,7 +282,7 @@ void UVSphere(uint32_t meridians, uint32_t parallels, Mesh &mesh)
 	{
 		uint32_t const a = i + 1;
 		uint32_t const b = (i + 1) % meridians + 1;
-		mesh.addTriangle(0, a, b);
+		mesh.addTriangle(0, b, a);
 	}
 
 	for (uint32_t j = 0; j < parallels - 2; ++j)
@@ -354,13 +365,16 @@ void NormalizedCube(uint32_t divisions, Mesh &mesh)
 	{
 		for (uint32_t j = 0; j < divisions; ++j)
 		{
+			const bool bottom = j < (divisions / 2);
 			for (uint32_t i = 0; i < divisions; ++i)
 			{
+				const bool left = i < (divisions / 2);
 				const uint32_t a = (face * k + j) * k + i;
 				const uint32_t b = (face * k + j) * k + i + 1;
 				const uint32_t c = (face * k + j + 1) * k + i;
 				const uint32_t d = (face * k + j + 1) * k + i + 1;
-				mesh.addQuad(a, b, d, c);
+				if (bottom ^ left) mesh.addQuadAlt(a, c, d, b);
+				else mesh.addQuad(a, c, d, b);
 			}
 		}
 	}
@@ -400,13 +414,16 @@ void SpherifiedCube(uint32_t divisions, Mesh &mesh)
 	{
 		for (uint32_t j = 0; j < divisions; ++j)
 		{
+			const bool bottom = j < (divisions / 2);
 			for (uint32_t i = 0; i < divisions; ++i)
 			{
+				const bool left = i < (divisions / 2);
 				const uint32_t a = (face * k + j) * k + i;
 				const uint32_t b = (face * k + j) * k + i + 1;
 				const uint32_t c = (face * k + j + 1) * k + i;
 				const uint32_t d = (face * k + j + 1) * k + i + 1;
-				mesh.addQuad(a, b, d, c);
+				if (bottom ^ left) mesh.addQuadAlt(a, c, d, b);
+				else mesh.addQuad(a, c, d, b);
 			}
 		}
 	}
@@ -453,9 +470,44 @@ void Icosahedron(Mesh &mesh)
 	mesh.addTriangle(9, 8, 1);
 }
 
+struct Edge
+{
+	uint32_t v0;
+	uint32_t v1;
+
+	Edge(uint32_t v0, uint32_t v1)
+		: v0(v0 < v1 ? v0 : v1)
+		, v1(v0 < v1 ? v1 : v0)
+	{
+	}
+
+	bool operator <(const Edge &rhs) const
+	{
+		return v0 < rhs.v0 || (v0 == rhs.v0 && v1 < rhs.v1);
+	}
+};
+
+uint32_t subdivideEdge(uint32_t f0, uint32_t f1, const Vector3 &v0, const Vector3 &v1, Mesh &io_mesh, std::map<Edge, uint32_t> &io_divisions)
+{
+	const Edge edge(f0, f1);
+	auto it = io_divisions.find(edge);
+	if (it != io_divisions.end())
+	{
+		return it->second;
+	}
+
+	const Vector3 v = normalize(Vector3(0.5) * (v0 + v1));
+	const uint32_t f = io_mesh.vertices.size();
+	io_mesh.vertices.emplace_back(v);
+	io_divisions.emplace(edge, f);
+	return f;
+}
+
 void SubdivideMesh(const Mesh &meshIn, Mesh &meshOut)
 {
 	meshOut.vertices = meshIn.vertices;
+
+	std::map<Edge, uint32_t> divisions; // Edge -> new vertex
 
 	for (uint32_t i = 0; i < meshIn.triangleCount(); ++i)
 	{
@@ -467,15 +519,9 @@ void SubdivideMesh(const Mesh &meshIn, Mesh &meshOut)
 		const Vector3 v1 = meshIn.vertices[f1];
 		const Vector3 v2 = meshIn.vertices[f2];
 
-		const Vector3 v3 = normalize(Vector3(0.5) * (v0 + v1));
-		const uint32_t f3 = meshOut.vertices.size();
-		meshOut.vertices.emplace_back(v3);
-		const Vector3 v4 = normalize(Vector3(0.5) * (v1 + v2));
-		const uint32_t f4 = meshOut.vertices.size();
-		meshOut.vertices.emplace_back(v4);
-		const Vector3 v5 = normalize(Vector3(0.5) * (v2 + v0));
-		const uint32_t f5 = meshOut.vertices.size();
-		meshOut.vertices.emplace_back(v5);
+		const uint32_t f3 = subdivideEdge(f0, f1, v0, v1, meshOut, divisions);
+		const uint32_t f4 = subdivideEdge(f1, f2, v1, v2, meshOut, divisions);
+		const uint32_t f5 = subdivideEdge(f2, f0, v2, v0, meshOut, divisions);
 
 		meshOut.addTriangle(f0, f3, f5);
 		meshOut.addTriangle(f3, f1, f4);
