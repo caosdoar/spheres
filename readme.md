@@ -72,7 +72,7 @@ for f in input_mesh.faces:
   v5 = normalize(0.5 * (v2 + v0))
   output_mesh.add_face(v0, v3, v5)
   output_mesh.add_face(v3, v1, v4)
-  output_mesh.add_face(v5, v2, v5)
+  output_mesh.add_face(v5, v4, v2)
   output_mesh.add_face(v3, v4, v5)
 ```
 
