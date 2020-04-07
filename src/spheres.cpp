@@ -50,6 +50,8 @@ SOFTWARE.
 
 #if _WIN32
 #include <Windows.h>
+#else
+typedef uint64_t LARGE_INTEGER;
 #endif
 
 struct Vector3
@@ -795,24 +797,41 @@ class Timer
 public:
 	void start()
 	{
+#if _WIN32
 		QueryPerformanceCounter(&m_begin);
+#else
+    clock_gettime(CLOCK_REALTIME, &m_begin);
+#endif
 	}
 
 	void end()
 	{
+#if _WIN32
 		QueryPerformanceCounter(&m_end);
 		QueryPerformanceFrequency(&m_freq);
+#else
+    clock_gettime(CLOCK_REALTIME, &m_end);
+#endif
 	}
 
 	double getMilliseconds() const
 	{
+#if _WIN32
 		return double((m_end.QuadPart - m_begin.QuadPart) * 1000) / double(m_freq.QuadPart);
+#else
+    return double((m_end.tv_nsec - m_end.tv_nsec)/1e9);
+#endif
 	}
 
 private:
+#if _WIN32
 	LARGE_INTEGER m_begin;
 	LARGE_INTEGER m_end;
 	LARGE_INTEGER m_freq;
+#else
+  timespec m_begin;
+  timespec m_end;
+#endif
 };
 
 void PrintCreationTimes()
